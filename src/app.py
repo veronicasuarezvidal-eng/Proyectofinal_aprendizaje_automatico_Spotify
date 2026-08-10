@@ -3,13 +3,8 @@ import pandas as pd
 import joblib
 import plotly.express as px
 
-
 clf = joblib.load('models/modelo_spotify_genre.pkl')
 
-<<<<<<< HEAD
-=======
-
->>>>>>> c92ea32 (proyecto)
 st.set_page_config(page_title="Spotify Genre Predictor", page_icon="🎵", layout="centered")
 
 st.title("🎵 Clasificador de Géneros Musicales de Spotify")
@@ -45,14 +40,10 @@ input_data = pd.DataFrame([{
     'explicit': explicit
 }])
 
-<<<<<<< HEAD
-# Gráfico de barras interactivo con Plotly
+
 st.subheader("📊 Perfil de Atributos del Audio")
 
-# Transponer datos para graficar los atributos numéricos
-=======
 st.subheader("📊 Perfil de Atributos del Audio")
->>>>>>> c92ea32 (proyecto)
 features_df = input_data.drop(columns=['explicit']).T.reset_index()
 features_df.columns = ['Atributo', 'Valor']
 
@@ -75,12 +66,7 @@ if st.button("🔮 Predecir Género"):
   
     st.markdown("## 🎶 🎵 🎶 🎵 🎶 🎵 🎶 🎵")
     st.success(f"🎧 El género predicho para este perfil musical es: **{str(prediction).upper()}**")
-<<<<<<< HEAD
-    
-   
-=======
-       
->>>>>>> c92ea32 (proyecto)
+
     df_pred = input_data.copy()
     df_pred.insert(0, 'genero_predicho', str(prediction).upper())
     
@@ -95,10 +81,7 @@ if st.button("🔮 Predecir Género"):
         file_name='pronostico_genero_spotify.csv',
         mime='text/csv'
     )
-<<<<<<< HEAD
+
 ##http://localhost:8501
 ##http://172.20.10.8:8501
-=======
-
->>>>>>> c92ea32 (proyecto)
 
