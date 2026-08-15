@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 import joblib
 import numpy as np
 import pandas as pd
@@ -10,7 +11,6 @@ st.set_page_config(
     page_icon="🎵",
     layout="wide",
 )
-
 
 st.markdown(
     """
@@ -65,10 +65,21 @@ st.markdown(
 
 @st.cache_resource
 def load_model():
-    ruta_modelo = "../models/modelo_final_ganador.pkl"
-    if not os.path.exists(ruta_modelo):
-        ruta_modelo = "models/modelo_final_ganador.pkl"
-    return joblib.load(ruta_modelo)
+    base_dir = Path(__file__).resolve().parent
+
+    rutas_posibles = [
+        base_dir / "models" / "modelo_final_ganador.pkl",
+        base_dir.parent / "models" / "modelo_final_ganador.pkl",
+        Path("models/modelo_final_ganador.pkl"),
+    ]
+
+    for ruta in rutas_posibles:
+        if ruta.exists():
+            return joblib.load(ruta)
+
+    raise FileNotFoundError(
+        "No se encontró 'models/modelo_final_ganador.pkl' en el repositorio."
+    )
 
 
 clf = load_model()
@@ -86,14 +97,12 @@ def apply_feature_engineering(df_in):
     return df_out
 
 
-# Título de la Aplicación
 st.title("🎵 Clasificador de Géneros Musicales de Spotify")
 st.write(
     "Ajusta los atributos en el panel lateral. El gráfico y la predicción se"
     " actualizarán en tiempo real."
 )
 
-# 4. BARRA LATERAL (Organizada en 2 COLUMNAS para los 10 atributos de ANOVA)
 st.sidebar.header("🎛️ Atributos del Audio (Top 10 ANOVA)")
 
 sb_col1, sb_col2 = st.sidebar.columns(2)
@@ -112,7 +121,6 @@ with sb_col2:
     duration_min = st.slider("Duración (min)", 0.5, 10.0, 3.5)
     liveness = st.slider("En vivo", 0.0, 1.0, 0.10)
 
-# 5. CONSTRUCCIÓN DE VARIABLES Y PREDICCIÓN AUTOMÁTICA
 top_10_features = [
     "acousticness",
     "energy",
@@ -150,19 +158,15 @@ raw_input_data = pd.DataFrame([
     }
 ])
 
-# Aplicar Feature Engineering y realizar la predicción en vivo
 input_featured = apply_feature_engineering(raw_input_data)
 X_input = input_featured[all_features]
 prediccion_genero = clf.predict(X_input)[0]
 
-# 6. ESTRUCTURA PRINCIPAL EN 2 COLUMNAS (Pantalla Dividida)
 col_grafico, col_resultado = st.columns([1.2, 1])
 
-# --- COLUMNA 1: Gráfico interactivo en vivo ---
 with col_grafico:
     st.subheader("📊 Perfil de Atributos del Audio")
 
-    # Preparar datos para el gráfico
     features_df = raw_input_data.T.reset_index()
     features_df.columns = ["Atributo", "Valor"]
 
@@ -186,27 +190,23 @@ with col_grafico:
 
     st.plotly_chart(fig, use_container_width=True)
 
-# --- COLUMNA 2: Resultado de Predicción y Datos ---
 with col_resultado:
     st.subheader("🎧 Género Predicho")
 
-   
     st.success(f"### 🎶 **{str(prediccion_genero).upper()}**")
 
     st.write("---")
-    st.subheader(" Resumen del Perfil")
+    st.subheader("📋 Resumen del Perfil")
 
     df_pred = raw_input_data.copy()
     df_pred.insert(0, "genero_predicho", str(prediccion_genero).upper())
 
     st.dataframe(df_pred, use_container_width=True)
 
-    # Botón de Descarga
     csv = df_pred.to_csv(index=False).encode("utf-8")
     st.download_button(
-        label=" Descargar Pronóstico (CSV)",
+        label="📥 Descargar Pronóstico (CSV)",
         data=csv,
         file_name="pronostico_genero_spotify.csv",
         mime="text/csv",
     )
-
