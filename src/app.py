@@ -1,11 +1,19 @@
-import streamlit as st
-import pandas as pd
+import os
 import joblib
+import numpy as np
+import pandas as pd
 import plotly.express as px
+import streamlit as st
 
-st.set_page_config(page_title="Spotify Genre Predictor", page_icon="🎵", layout="centered")
+st.set_page_config(
+    page_title="Spotify Genre Predictor",
+    page_icon="🎵",
+    layout="wide",
+)
 
-st.markdown("""
+
+st.markdown(
+    """
     <style>
     .stApp {
         background-color: #121212 !important;
@@ -20,6 +28,7 @@ st.markdown("""
     [data-testid="stWidgetLabel"] p {
         color: #1DB954 !important;
         font-weight: 600;
+        font-size: 0.9rem;
     }
     div[data-baseweb="slider"] div[role="slider"] {
         background-color: #1DB954 !important;
@@ -31,105 +40,173 @@ st.markdown("""
         background-color: #282828 !important;
         color: #FFFFFF !important;
     }
-    div[data-baseweb="slider"] p, 
+    div[data-baseweb="slider"] p,
     div[data-baseweb="slider"] span {
         color: #FFFFFF !important;
     }
-    div.stButton > button, div.stDownloadButton > button {
+    div.stDownloadButton > button {
         background-color: #1DB954 !important;
         color: #000000 !important;
         font-weight: bold !important;
         border-radius: 50px !important;
         border: none !important;
         padding: 10px 24px !important;
-        transition: all 0.2s ease;
+        width: 100%;
     }
-    div.stButton > button:hover, div.stDownloadButton > button:hover {
+    div.stDownloadButton > button:hover {
         background-color: #1ed760 !important;
         color: #000000 !important;
-        transform: scale(1.03);
     }
     </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
+
 
 @st.cache_resource
 def load_model():
-    return joblib.load('models/modelo_spotify_genre.pkl')
+    ruta_modelo = "../models/modelo_final_ganador.pkl"
+    if not os.path.exists(ruta_modelo):
+        ruta_modelo = "models/modelo_final_ganador.pkl"
+    return joblib.load(ruta_modelo)
+
 
 clf = load_model()
 
+
+def apply_feature_engineering(df_in):
+    df_out = df_in.copy()
+    loudness_abs = np.abs(df_out["loudness"]) + 1e-5
+    df_out["energy_loudness_ratio"] = df_out["energy"] / loudness_abs
+    df_out["acoustic_electric_ratio"] = df_out["acousticness"] / (
+        df_out["energy"] + 1e-5
+    )
+    df_out["dance_energy_prod"] = df_out["danceability"] * df_out["energy"]
+    df_out["mood_index"] = df_out["valence"] * df_out["danceability"]
+    return df_out
+
+
+# Título de la Aplicación
 st.title("🎵 Clasificador de Géneros Musicales de Spotify")
-st.write("Ajusta las características del audio en el panel izquierdo para predecir el género musical.")
-
-st.sidebar.header("🎛️ Atributos del Audio")
-
-danceability = st.sidebar.slider("Bailabilidad (Danceability)", 0.0, 1.0, 0.50)
-energy = st.sidebar.slider("Energía (Energy)", 0.0, 1.0, 0.50)
-loudness = st.sidebar.slider("Sonoridad (Loudness dB)", -60.0, 0.0, -10.0)
-speechiness = st.sidebar.slider("Voz hablada (Speechiness)", 0.0, 1.0, 0.10)
-acousticness = st.sidebar.slider("Acústica (Acousticness)", 0.0, 1.0, 0.20)
-instrumentalness = st.sidebar.slider("Instrumentalidad (Instrumentalness)", 0.0, 1.0, 0.00)
-liveness = st.sidebar.slider("En vivo (Liveness)", 0.0, 1.0, 0.10)
-valence = st.sidebar.slider("Positividad (Valence)", 0.0, 1.0, 0.50)
-tempo = st.sidebar.slider("Tempo (BPM)", 50.0, 220.0, 120.0)
-popularity = st.sidebar.slider("Popularidad (Popularity)", 0, 100, 50)
-explicit = st.sidebar.selectbox("¿Contenido Explícito?", [0, 1], format_func=lambda x: "Sí" if x == 1 else "No")
-
-raw_input_data = pd.DataFrame([{
-    'danceability': danceability,
-    'energy': energy,
-    'loudness': loudness,
-    'speechiness': speechiness,
-    'acousticness': acousticness,
-    'instrumentalness': instrumentalness,
-    'liveness': liveness,
-    'valence': valence,
-    'tempo': tempo,
-    'popularity': popularity,
-    'explicit': explicit
-}])
-
-st.subheader("📊 Perfil de Atributos del Audio")
-
-features_df = raw_input_data.drop(columns=['explicit']).T.reset_index()
-features_df.columns = ['Atributo', 'Valor']
-
-fig = px.bar(
-    features_df,
-    x='Atributo',
-    y='Valor',
-    title="Atributos del Audio Seleccionados",
-    labels={'Atributo': 'Características', 'Valor': 'Nivel'},
-    color='Valor',
-    color_continuous_scale=['#052e16', '#1DB954', '#1ed760']
+st.write(
+    "Ajusta los atributos en el panel lateral. El gráfico y la predicción se"
+    " actualizarán en tiempo real."
 )
 
-fig.update_layout(
-    template="plotly_dark",
-    paper_bgcolor='rgba(0,0,0,0)',
-    plot_bgcolor='rgba(0,0,0,0)',
-    font=dict(color="#FFFFFF")
-)
+# 4. BARRA LATERAL (Organizada en 2 COLUMNAS para los 10 atributos de ANOVA)
+st.sidebar.header("🎛️ Atributos del Audio (Top 10 ANOVA)")
 
-st.plotly_chart(fig, use_container_width=True)
+sb_col1, sb_col2 = st.sidebar.columns(2)
 
-if st.button("🔮 Predecir Género"):
-    prediction = clf.predict(raw_input_data)[0]
-    
-    st.markdown("## 🎶 🎵 🎶 🎵 🎶 🎵 🎶 🎵")
-    st.success(f"🎧 El género predicho para este perfil musical es: **{str(prediction).upper()}**")
+with sb_col1:
+    acousticness = st.slider("Acústica", 0.0, 1.0, 0.20)
+    energy = st.slider("Energía", 0.0, 1.0, 0.50)
+    instrumentalness = st.slider("Instrumental", 0.0, 1.0, 0.00)
+    loudness = st.slider("Sonoridad (dB)", -60.0, 0.0, -10.0)
+    speechiness = st.slider("Voz hablada", 0.0, 1.0, 0.10)
+
+with sb_col2:
+    danceability = st.slider("Bailabilidad", 0.0, 1.0, 0.50)
+    valence = st.slider("Positividad", 0.0, 1.0, 0.50)
+    popularity = st.slider("Popularidad", 0, 100, 50)
+    duration_min = st.slider("Duración (min)", 0.5, 10.0, 3.5)
+    liveness = st.slider("En vivo", 0.0, 1.0, 0.10)
+
+# 5. CONSTRUCCIÓN DE VARIABLES Y PREDICCIÓN AUTOMÁTICA
+top_10_features = [
+    "acousticness",
+    "energy",
+    "instrumentalness",
+    "loudness",
+    "speechiness",
+    "danceability",
+    "valence",
+    "popularity",
+    "duration_min",
+    "liveness",
+]
+
+engineered_features = [
+    "energy_loudness_ratio",
+    "acoustic_electric_ratio",
+    "dance_energy_prod",
+    "mood_index",
+]
+
+all_features = top_10_features + engineered_features
+
+raw_input_data = pd.DataFrame([
+    {
+        "acousticness": acousticness,
+        "energy": energy,
+        "instrumentalness": instrumentalness,
+        "loudness": loudness,
+        "speechiness": speechiness,
+        "danceability": danceability,
+        "valence": valence,
+        "popularity": popularity,
+        "duration_min": duration_min,
+        "liveness": liveness,
+    }
+])
+
+# Aplicar Feature Engineering y realizar la predicción en vivo
+input_featured = apply_feature_engineering(raw_input_data)
+X_input = input_featured[all_features]
+prediccion_genero = clf.predict(X_input)[0]
+
+# 6. ESTRUCTURA PRINCIPAL EN 2 COLUMNAS (Pantalla Dividida)
+col_grafico, col_resultado = st.columns([1.2, 1])
+
+# --- COLUMNA 1: Gráfico interactivo en vivo ---
+with col_grafico:
+    st.subheader("📊 Perfil de Atributos del Audio")
+
+    # Preparar datos para el gráfico
+    features_df = raw_input_data.T.reset_index()
+    features_df.columns = ["Atributo", "Valor"]
+
+    fig = px.bar(
+        features_df,
+        x="Atributo",
+        y="Valor",
+        labels={"Atributo": "Características", "Valor": "Nivel"},
+        color="Valor",
+        color_continuous_scale=["#052e16", "#1DB954", "#1ed760"],
+    )
+
+    fig.update_layout(
+        template="plotly_dark",
+        paper_bgcolor="rgba(0,0,0,0)",
+        plot_bgcolor="rgba(0,0,0,0)",
+        font=dict(color="#FFFFFF"),
+        margin=dict(l=10, r=10, t=20, b=10),
+        height=380,
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+# --- COLUMNA 2: Resultado de Predicción y Datos ---
+with col_resultado:
+    st.subheader("🎧 Género Predicho")
+
+   
+    st.success(f"### 🎶 **{str(prediccion_genero).upper()}**")
+
+    st.write("---")
+    st.subheader(" Resumen del Perfil")
 
     df_pred = raw_input_data.copy()
-    df_pred.insert(0, 'genero_predicho', str(prediction).upper())
-    
-    st.subheader('Tabla Detallada')
+    df_pred.insert(0, "genero_predicho", str(prediccion_genero).upper())
+
     st.dataframe(df_pred, use_container_width=True)
-    
-    csv = df_pred.to_csv(index=False).encode('utf-8')
-    
+
+    # Botón de Descarga
+    csv = df_pred.to_csv(index=False).encode("utf-8")
     st.download_button(
-        label='Descargar Pronóstico en CSV',
+        label=" Descargar Pronóstico (CSV)",
         data=csv,
-        file_name='pronostico_genero_spotify.csv',
-        mime='text/csv'
+        file_name="pronostico_genero_spotify.csv",
+        mime="text/csv",
     )
+
